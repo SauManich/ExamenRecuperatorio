@@ -6,6 +6,10 @@
 <title>Resultados – Evaluación Final</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
 
+<!-- 📄 jsPDF + AutoTable para exportación -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+
 <!-- ✅ Firebase SDK -->
 <script type="module">
   import { db } from "./js/firebase-config.js";
@@ -83,6 +87,9 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .search-box svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);width:14px;height:14px;color:var(--text3);pointer-events:none;}
 .btn-clear{padding:7px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-family:'Inter',sans-serif;font-size:12.5px;font-weight:500;color:var(--text2);cursor:pointer;transition:all .2s;white-space:nowrap;}
 .btn-clear:hover{color:var(--red);border-color:var(--red);background:var(--red-bg);}
+.btn-pdf{padding:7px 14px;background:var(--accent);border:1px solid var(--accent);border-radius:8px;font-family:'Inter',sans-serif;font-size:12.5px;font-weight:600;color:#fff;cursor:pointer;transition:all .2s;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;}
+.btn-pdf:hover{background:var(--accent-h);border-color:var(--accent-h);}
+.btn-pdf:disabled{opacity:.5;cursor:not-allowed;}
 
 /* TABLE */
 .table-wrap{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:var(--shadow-xs);}
@@ -201,6 +208,12 @@ tr.row-entry:hover{background:var(--surface);}
       </svg>
       <input type="text" id="search-input" placeholder="Buscar estudiante…" oninput="filterTable()">
     </div>
+    <button class="btn-pdf" onclick="downloadPDF()" id="btn-pdf">
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+      </svg>
+      Descargar PDF
+    </button>
     <button class="btn-clear" onclick="confirmClear()">🗑 Limpiar todo</button>
   </div>
 
@@ -386,6 +399,103 @@ function filterTable() {
         (r.paralelo || '').toLowerCase().includes(q))
     : allResults;
   renderTable(filtered);
+}
+
+/* DOWNLOAD PDF */
+function downloadPDF() {
+  if (!window.jspdf || !window.jspdf.jsPDF) {
+    alert('jsPDF no cargado aún. Intenta de nuevo en unos segundos.');
+    return;
+  }
+  if (!allResults || allResults.length === 0) {
+    alert('No hay resultados para exportar.');
+    return;
+  }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape' });
+  const W = doc.internal.pageSize.getWidth();
+
+  const blue = [26, 115, 232];
+  const dark = [28, 30, 33];
+  const gray = [100, 110, 125];
+
+  // Header bar
+  doc.setFillColor(...blue); doc.rect(0, 0, W, 11, 'F');
+  doc.setFontSize(8); doc.setTextColor(255,255,255); doc.setFont('helvetica','bold');
+  doc.text('PANEL DE RESULTADOS — EVALUACIÓN FINAL', 14, 7.5);
+  doc.text(new Date().toLocaleString('es-BO'), W - 14, 7.5, { align: 'right' });
+
+  // Title
+  doc.setFontSize(16); doc.setTextColor(...dark); doc.setFont('helvetica','bold');
+  doc.text('Resultados de Estudiantes', 14, 22);
+  doc.setFontSize(9); doc.setTextColor(...gray); doc.setFont('helvetica','normal');
+  doc.text(`Total: ${allResults.length} estudiante${allResults.length !== 1 ? 's' : ''}`, 14, 28);
+
+  // Stats inline
+  const scores = allResults.map(r => (r.correctas / r.total) * 100);
+  const avg   = scores.reduce((a,b)=>a+b,0) / scores.length;
+  const best  = Math.max(...scores);
+  const worst = Math.min(...scores);
+  doc.text(`Promedio: ${Math.round(avg)}%   ·   Máx: ${Math.round(best)}%   ·   Mín: ${Math.round(worst)}%`, 14, 33);
+
+  // Table
+  const head = [['#','Nombre','Apellidos','Paralelo','Resultado','%','Hora Inicio','Hora Fin','Fecha','Tiempo Vencido']];
+  const body = allResults.map((r,i) => {
+    const pct = Math.round((r.correctas / r.total) * 100);
+    return [
+      i+1,
+      r.nombre || '—',
+      r.apellidos || '—',
+      r.paralelo || '—',
+      `${r.correctas} / ${r.total}`,
+      `${pct}%`,
+      fmtTime(r.horaInicio),
+      fmtTime(r.horaFin),
+      r.fecha || fmtDate(r.horaInicio),
+      r.tiempoVencido ? 'Sí' : 'No'
+    ];
+  });
+
+  doc.autoTable({
+    head, body,
+    startY: 38,
+    theme: 'grid',
+    styles: { font: 'helvetica', fontSize: 8, cellPadding: 2.2, textColor: dark, lineColor: [220,225,232], lineWidth: 0.15 },
+    headStyles: { fillColor: blue, textColor: 255, fontStyle: 'bold', fontSize: 8.5, halign: 'center' },
+    columnStyles: {
+      0: { halign: 'center', cellWidth: 9 },
+      3: { halign: 'center', cellWidth: 16 },
+      4: { halign: 'center', cellWidth: 22 },
+      5: { halign: 'center', cellWidth: 14 },
+      6: { halign: 'center', cellWidth: 22 },
+      7: { halign: 'center', cellWidth: 22 },
+      8: { halign: 'center', cellWidth: 26 },
+      9: { halign: 'center', cellWidth: 18 }
+    },
+    alternateRowStyles: { fillColor: [247,248,250] },
+    didParseCell: (data) => {
+      if (data.section === 'body' && data.column.index === 5) {
+        const pct = parseInt(data.cell.raw);
+        if (pct >= 100) { data.cell.styles.textColor = [22,163,74];  data.cell.styles.fontStyle = 'bold'; }
+        else if (pct >= 60) { data.cell.styles.textColor = [180,83,9]; data.cell.styles.fontStyle = 'bold'; }
+        else { data.cell.styles.textColor = [220,38,38]; data.cell.styles.fontStyle = 'bold'; }
+      }
+      if (data.section === 'body' && data.column.index === 9 && data.cell.raw === 'Sí') {
+        data.cell.styles.textColor = [220,38,38]; data.cell.styles.fontStyle = 'bold';
+      }
+    },
+    margin: { left: 10, right: 10 },
+    didDrawPage: (data) => {
+      const pageCount = doc.internal.getNumberOfPages();
+      const pageNum   = doc.internal.getCurrentPageInfo().pageNumber;
+      doc.setFontSize(7.5); doc.setTextColor(...gray); doc.setFont('helvetica','normal');
+      doc.text(`Página ${pageNum} de ${pageCount}`, W - 14, doc.internal.pageSize.getHeight() - 6, { align: 'right' });
+    }
+  });
+
+  const stamp = new Date().toISOString().slice(0,10);
+  doc.save(`resultados-evaluacion-${stamp}.pdf`);
 }
 
 /* CLEAR ALL */
