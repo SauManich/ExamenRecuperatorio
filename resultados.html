@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Resultados – Evaluación Final</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+
+<!-- ✅ Firebase SDK -->
+<script type="module">
+  import { db } from "./js/firebase-config.js";
+  import { collection, onSnapshot, orderBy, query, deleteDoc, doc }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  window._db        = db;
+  window._collection= collection;
+  window._onSnapshot= onSnapshot;
+  window._orderBy   = orderBy;
+  window._query     = query;
+  window._deleteDoc = deleteDoc;
+  window._doc       = doc;
+
+  // Start listening once Firebase is ready
+  window.addEventListener('load', () => startListening());
+</script>
+
+<style>
+:root {
+  --bg:#ffffff; --surface:#f7f8fa; --card:#ffffff;
+  --border:#e2e5ea; --text:#1c1e21; --text2:#6b7280; --text3:#9ca3af;
+  --accent:#1a73e8; --accent-h:#1557b0;
+  --green:#16a34a; --green-bg:#f0fdf4; --green-bd:#bbf7d0;
+  --red:#dc2626;   --red-bg:#fef2f2;   --red-bd:#fecaca;
+  --gold:#b45309;  --gold-bg:#fffbeb;  --gold-bd:#fde68a;
+  --shadow-xs:0 1px 3px rgba(0,0,0,0.06);
+  --shadow-sm:0 2px 8px rgba(0,0,0,0.07);
+}
+[data-theme="dark"] {
+  --bg:#1A1B1F; --surface:#22232a; --card:#2a2b33;
+  --border:#383944; --text:#e4e6f0; --text2:#8888a8; --text3:#55556a;
+  --accent:#4d90fe; --accent-h:#3a7be0;
+  --green:#22c55e; --green-bg:#052e16; --green-bd:#166534;
+  --red:#f87171;   --red-bg:#450a0a;   --red-bd:#7f1d1d;
+  --gold:#fcd34d;  --gold-bg:#1c1100;  --gold-bd:#78350f;
+  --shadow-xs:0 1px 3px rgba(0,0,0,0.25);
+  --shadow-sm:0 2px 8px rgba(0,0,0,0.3);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased;transition:background .28s,color .28s;}
+
+/* THEME BTN */
+#theme-btn{position:fixed;top:14px;right:14px;z-index:999;width:36px;height:36px;background:var(--card);border:1px solid var(--border);border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text2);box-shadow:var(--shadow-xs);transition:border-color .2s,color .2s;}
+#theme-btn:hover{color:var(--accent);border-color:var(--accent);}
+#theme-btn svg{width:16px;height:16px;}
+
+/* LAYOUT */
+.page{max-width:860px;margin:0 auto;padding:40px 20px 80px;}
+
+/* HEADER */
+.page-header{display:flex;align-items:center;gap:14px;margin-bottom:32px;padding-bottom:20px;border-bottom:1px solid var(--border);}
+.header-logo{width:44px;height:44px;border-radius:11px;overflow:hidden;background:var(--surface);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.header-logo img{width:100%;height:100%;object-fit:contain;padding:5px;}
+.header-text{}
+.header-title{font-family:'Playfair Display',serif;font-size:1.4rem;font-weight:700;color:var(--text);line-height:1.2;}
+.header-sub{font-size:12px;color:var(--text2);margin-top:2px;letter-spacing:.3px;text-transform:uppercase;}
+
+/* STATS ROW */
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:28px;}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 18px;box-shadow:var(--shadow-xs);}
+.stat-label{font-size:10.5px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--text3);margin-bottom:6px;}
+.stat-value{font-size:1.7rem;font-weight:700;color:var(--text);line-height:1;}
+.stat-value.accent{color:var(--accent);}
+.stat-value.green{color:var(--green);}
+.stat-value.red{color:var(--red);}
+
+/* TOOLBAR */
+.toolbar{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
+.toolbar-title{font-size:13px;font-weight:600;color:var(--text2);flex:1;min-width:120px;}
+.search-box{flex:1;min-width:180px;max-width:280px;position:relative;}
+.search-box input{width:100%;padding:8px 12px 8px 34px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);font-family:'Inter',sans-serif;font-size:13px;outline:none;transition:border-color .2s;}
+.search-box input:focus{border-color:var(--accent);}
+.search-box svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);width:14px;height:14px;color:var(--text3);pointer-events:none;}
+.btn-clear{padding:7px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-family:'Inter',sans-serif;font-size:12.5px;font-weight:500;color:var(--text2);cursor:pointer;transition:all .2s;white-space:nowrap;}
+.btn-clear:hover{color:var(--red);border-color:var(--red);background:var(--red-bg);}
+
+/* TABLE */
+.table-wrap{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:var(--shadow-xs);}
+table{width:100%;border-collapse:collapse;}
+thead{background:var(--surface);}
+th{padding:11px 16px;text-align:left;font-size:10.5px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--text3);border-bottom:1px solid var(--border);}
+td{padding:13px 16px;font-size:13.5px;color:var(--text);border-bottom:1px solid var(--border);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tr.row-entry{transition:background .15s;}
+tr.row-entry:hover{background:var(--surface);}
+
+/* Name cell */
+.name-cell{display:flex;align-items:center;gap:10px;}
+.avatar{width:30px;height:30px;border-radius:50%;background:var(--accent-h);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;}
+.name-text{font-weight:600;}
+.date-cell{font-size:12px;color:var(--text3);}
+.time-cell{font-size:12px;color:var(--text2);}
+
+/* Score badge */
+.score-badge{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:99px;font-size:13px;font-weight:700;}
+.score-badge.perfect{background:var(--green-bg);color:var(--green);border:1px solid var(--green-bd);}
+.score-badge.good   {background:var(--gold-bg);color:var(--gold);border:1px solid var(--gold-bd);}
+.score-badge.poor   {background:var(--red-bg);color:var(--red);border:1px solid var(--red-bd);}
+
+/* % bar */
+.pct-bar-wrap{display:flex;align-items:center;gap:8px;}
+.pct-bar-track{flex:1;height:5px;background:var(--border);border-radius:99px;overflow:hidden;min-width:60px;}
+.pct-bar-fill{height:100%;border-radius:99px;transition:width .5s;}
+.pct-label{font-size:11.5px;font-weight:600;color:var(--text2);min-width:32px;text-align:right;}
+
+/* Empty state */
+.empty{text-align:center;padding:60px 20px;color:var(--text3);}
+.empty svg{width:40px;height:40px;margin:0 auto 12px;opacity:.35;}
+.empty p{font-size:14px;}
+
+/* Loading pulse */
+.loading{display:flex;justify-content:center;padding:48px;}
+.pulse{width:8px;height:8px;border-radius:50%;background:var(--accent);animation:pulse 1.2s ease-in-out infinite;}
+.pulse:nth-child(2){animation-delay:.2s;}
+.pulse:nth-child(3){animation-delay:.4s;}
+.loading{gap:6px;align-items:center;}
+@keyframes pulse{0%,100%{opacity:.3;transform:scale(0.8)}50%{opacity:1;transform:scale(1)}}
+
+/* Live dot */
+.live-dot{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--green);font-weight:600;}
+.live-dot::before{content:'';width:6px;height:6px;background:var(--green);border-radius:50%;animation:blink 1.4s ease-in-out infinite;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+
+@media(max-width:600px){
+  th:nth-child(4),td:nth-child(4){display:none;}
+  .pct-bar-track{min-width:40px;}
+  .page{padding:24px 14px 60px;}
+}
+</style>
+</head>
+<body>
+
+<button id="theme-btn" onclick="toggleTheme()" title="Cambiar tema">
+  <svg id="ti" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+  </svg>
+</button>
+
+<div class="page">
+
+  <!-- Header -->
+  <div class="page-header">
+    <div class="header-logo">
+      <img src="https://s.educacaoadventista.org.br/escola/conteudos/DEkFNtmxBWwO6oKynYon4lgonGA1COYLDJuEsxjW.png"
+           alt="Logo" onerror="this.parentElement.innerHTML='📚'">
+    </div>
+    <div class="header-text">
+      <div class="header-title">Panel de Resultados</div>
+      <div class="header-sub">Evaluación Final · Biología: Las Células · 2025</div>
+    </div>
+    <span class="live-dot" style="margin-left:auto">En vivo</span>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-label">Total estudiantes</div>
+      <div class="stat-value accent" id="stat-total">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Promedio</div>
+      <div class="stat-value" id="stat-avg">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Nota más alta</div>
+      <div class="stat-value green" id="stat-best">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Nota más baja</div>
+      <div class="stat-value red" id="stat-worst">—</div>
+    </div>
+  </div>
+
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <span class="toolbar-title" id="list-count">Cargando resultados…</span>
+    <div class="search-box">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"/><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35"/>
+      </svg>
+      <input type="text" id="search-input" placeholder="Buscar estudiante…" oninput="filterTable()">
+    </div>
+    <button class="btn-clear" onclick="confirmClear()">🗑 Limpiar todo</button>
+  </div>
+
+  <!-- Table -->
+  <div class="table-wrap">
+    <div id="loading-state" class="loading">
+      <div class="pulse"></div><div class="pulse"></div><div class="pulse"></div>
+    </div>
+    <table id="results-table" style="display:none">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Estudiante</th>
+          <th>Resultado</th>
+          <th>Progreso</th>
+          <th>Hora Inicio</th>
+          <th>Hora Fin</th>
+          <th>Fecha</th>
+        </tr>
+      </thead>
+      <tbody id="results-body"></tbody>
+    </table>
+    <div id="empty-state" class="empty" style="display:none">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+      </svg>
+      <p>Todavía no hay resultados.<br>Comparte el link del examen con tus estudiantes.</p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* THEME */
+function toggleTheme() {
+  const h = document.documentElement;
+  const dark = h.getAttribute('data-theme') === 'dark';
+  h.setAttribute('data-theme', dark ? 'light' : 'dark');
+  document.getElementById('ti').innerHTML = dark
+    ? '<path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>'
+    : '<circle cx="12" cy="12" r="5"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72 1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>';
+}
+
+/* DATA */
+let allResults = [];
+
+function fmtTime(iso) {
+  try { return new Date(iso).toLocaleTimeString('es-BO',{hour:'2-digit',minute:'2-digit',second:'2-digit'}); }
+  catch { return '—'; }
+}
+function fmtDate(iso) {
+  try { return new Date(iso).toLocaleDateString('es-BO',{day:'2-digit',month:'short',year:'numeric'}); }
+  catch { return '—'; }
+}
+function initials(name) {
+  return name.split(' ').slice(0,2).map(w=>w[0]?.toUpperCase()||'').join('');
+}
+function pctColor(pct) {
+  if (pct >= 100) return '#16a34a';
+  if (pct >= 60)  return '#b45309';
+  return '#dc2626';
+}
+function badgeClass(pct) {
+  if (pct >= 100) return 'perfect';
+  if (pct >= 60)  return 'good';
+  return 'poor';
+}
+
+/* START LISTENING */
+function startListening() {
+  const db = window._db;
+  if (!db) {
+    document.getElementById('loading-state').innerHTML =
+      '<p style="color:#dc2626;padding:20px;font-size:13px">⚠️ Firebase no configurado. Edita las credenciales en ambos archivos HTML.</p>';
+    return;
+  }
+  const q = window._query(window._collection(db,'resultados'), window._orderBy('guardadoEn','desc'));
+  window._onSnapshot(q, snap => {
+    allResults = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderTable(allResults);
+    updateStats(allResults);
+  }, err => {
+    console.error(err);
+    document.getElementById('loading-state').innerHTML =
+      `<p style="color:#dc2626;padding:20px;font-size:13px">⚠️ Error: ${err.message}</p>`;
+  });
+}
+
+/* RENDER TABLE */
+function renderTable(data) {
+  const loading  = document.getElementById('loading-state');
+  const table    = document.getElementById('results-table');
+  const empty    = document.getElementById('empty-state');
+  const tbody    = document.getElementById('results-body');
+  const countEl  = document.getElementById('list-count');
+
+  loading.style.display = 'none';
+
+  if (data.length === 0) {
+    table.style.display   = 'none';
+    empty.style.display   = 'block';
+    countEl.textContent   = 'Sin resultados aún';
+    return;
+  }
+
+  table.style.display = 'table';
+  empty.style.display = 'none';
+  countEl.textContent = `${data.length} estudiante${data.length !== 1 ? 's' : ''}`;
+
+  tbody.innerHTML = data.map((r, i) => {
+    const pct   = Math.round((r.correctas / r.total) * 100);
+    const bClass= badgeClass(pct);
+    const color = pctColor(pct);
+    return `
+      <tr class="row-entry" data-id="${r.id}">
+        <td style="color:var(--text3);font-size:12px;width:36px">${i+1}</td>
+        <td>
+          <div class="name-cell">
+            <div class="avatar">${initials(r.nombre)}</div>
+            <span class="name-text">${r.nombre}</span>
+          </div>
+        </td>
+        <td>
+          <span class="score-badge ${bClass}">
+            ${r.correctas} / ${r.total}
+          </span>
+        </td>
+        <td>
+          <div class="pct-bar-wrap">
+            <div class="pct-bar-track">
+              <div class="pct-bar-fill" style="width:${pct}%;background:${color}"></div>
+            </div>
+            <span class="pct-label" style="color:${color}">${pct}%</span>
+          </div>
+        </td>
+        <td class="time-cell">${fmtTime(r.horaInicio)}</td>
+        <td class="time-cell">${fmtTime(r.horaFin)}</td>
+        <td class="date-cell">${r.fecha || fmtDate(r.horaInicio)}</td>
+      </tr>`;
+  }).join('');
+}
+
+/* STATS */
+function updateStats(data) {
+  if (data.length === 0) {
+    ['stat-total','stat-avg','stat-best','stat-worst'].forEach(id =>
+      document.getElementById(id).textContent = '—');
+    return;
+  }
+  const scores = data.map(r => (r.correctas / r.total) * 100);
+  const avg  = scores.reduce((a,b)=>a+b,0) / scores.length;
+  const best = Math.max(...scores);
+  const worst= Math.min(...scores);
+
+  document.getElementById('stat-total').textContent = data.length;
+  document.getElementById('stat-avg').textContent   = Math.round(avg) + '%';
+  document.getElementById('stat-best').textContent  = Math.round(best) + '%';
+  document.getElementById('stat-worst').textContent = Math.round(worst) + '%';
+}
+
+/* FILTER */
+function filterTable() {
+  const q = document.getElementById('search-input').value.toLowerCase();
+  const filtered = q
+    ? allResults.filter(r => r.nombre.toLowerCase().includes(q))
+    : allResults;
+  renderTable(filtered);
+}
+
+/* CLEAR ALL */
+async function confirmClear() {
+  if (!confirm('¿Estás seguro de que quieres eliminar TODOS los resultados? Esta acción no se puede deshacer.')) return;
+  const db = window._db;
+  if (!db) return;
+  for (const r of allResults) {
+    await window._deleteDoc(window._doc(db, 'resultados', r.id));
+  }
+}
+</script>
+</body>
+</html>

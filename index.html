@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Evaluación Final – Las Células</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<!-- 🔥 Firebase: expone helpers en window para usarlos desde el script clásico -->
+<script type="module">
+  import { db } from "./js/firebase-config.js";
+  import { collection, addDoc, serverTimestamp }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  window._db                = db;
+  window._collection        = collection;
+  window._addDoc            = addDoc;
+  window._serverTimestamp   = serverTimestamp;
+  window.dispatchEvent(new Event('firebase-ready'));
+</script>
+<style>
+/* ===== TOKENS ===== */
+:root {
+  --bg:           #ffffff;
+  --surface:      #f7f8fa;
+  --card:         #ffffff;
+  --border:       #e2e5ea;
+  --border-focus: #1a73e8;
+  --text:         #1c1e21;
+  --text2:        #6b7280;
+  --text3:        #9ca3af;
+  --accent:       #1a73e8;
+  --accent-h:     #1557b0;
+  --opt-hover:    #f0f4ff;
+  --opt-sel-bg:   #e8f0fe;
+  --opt-sel-bd:   #1a73e8;
+  --prog-bg:      #e8eaed;
+  --finish-bg:    #1c1e21;
+  --finish-h:     #0f1012;
+  --shadow-xs:    0 1px 2px rgba(0,0,0,0.05);
+}
+[data-theme="dark"] {
+  --bg:           #1A1B1F;
+  --surface:      #22232a;
+  --card:         #2a2b33;
+  --border:       #383944;
+  --border-focus: #4d90fe;
+  --text:         #e4e6f0;
+  --text2:        #8888a8;
+  --text3:        #55556a;
+  --accent:       #4d90fe;
+  --accent-h:     #3a7be0;
+  --opt-hover:    #1e2235;
+  --opt-sel-bg:   #1e2a3e;
+  --opt-sel-bd:   #4d90fe;
+  --prog-bg:      #383944;
+  --finish-bg:    #4d90fe;
+  --finish-h:     #3a7be0;
+  --shadow-xs:    0 1px 2px rgba(0,0,0,0.2);
+}
+
+/* ===== RESET ===== */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  font-family:'Inter',sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  min-height:100vh;
+  transition:background .28s,color .28s;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ===== THEME BTN ===== */
+#theme-btn{
+  position:fixed;top:14px;right:14px;z-index:999;
+  width:36px;height:36px;
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:50%;
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  color:var(--text2);
+  box-shadow:var(--shadow-xs);
+  transition:border-color .2s,color .2s;
+}
+#theme-btn:hover{color:var(--accent);border-color:var(--accent);}
+#theme-btn svg{width:16px;height:16px;}
+
+/* ===== SCREENS ===== */
+.screen{display:none;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+.screen.active{animation:fadeUp .3s ease;}
+
+/* ===== COVER ===== */
+#cover.active{
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  min-height:100vh;
+  padding:40px 20px;
+}
+.cover-inner{
+  width:100%;max-width:380px;
+  display:flex;flex-direction:column;
+  align-items:center;
+}
+
+/* Logo */
+.cover-logo{
+  width:72px;height:72px;
+  border-radius:16px;
+  overflow:hidden;
+  margin-bottom:24px;
+  background:var(--surface);
+  border:1px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+}
+.cover-logo img{width:100%;height:100%;object-fit:contain;padding:8px;}
+
+/* --- Formal title block --- */
+.cover-header{
+  text-align:center;
+  margin-bottom:28px;
+  width:100%;
+}
+.cover-institution{
+  font-size:10px;
+  font-weight:700;
+  letter-spacing:2.5px;
+  text-transform:uppercase;
+  color:var(--text3);
+  margin-bottom:10px;
+}
+.cover-divider-top{
+  width:40px;height:2px;
+  background:var(--accent);
+  margin:0 auto 14px;
+  border-radius:2px;
+}
+.cover-title{
+  font-family:'Playfair Display',serif;
+  font-size:clamp(1.6rem,5.5vw,2.1rem);
+  font-weight:700;
+  color:var(--text);
+  line-height:1.2;
+  margin-bottom:6px;
+}
+.cover-subject{
+  font-size:12px;
+  font-weight:500;
+  color:var(--text2);
+  letter-spacing:.5px;
+  text-transform:uppercase;
+  margin-bottom:4px;
+}
+.cover-year{
+  font-size:11.5px;color:var(--text3);font-weight:400;
+}
+.cover-divider-bot{
+  width:28px;height:1px;
+  background:var(--border);
+  margin:12px auto 0;
+}
+
+/* --- Input floating label --- */
+.field{
+  width:100%;
+  position:relative;
+  margin-bottom:14px;
+}
+.field input{
+  width:100%;
+  padding:20px 14px 8px;
+  border:1.5px solid var(--border);
+  border-radius:10px;
+  background:transparent;
+  color:var(--text);
+  font-family:'Inter',sans-serif;
+  font-size:15px;
+  font-weight:500;
+  text-align:center;
+  outline:none;
+  transition:border-color .2s;
+  caret-color:var(--accent);
+}
+.field input::placeholder{color:transparent;}
+.field label{
+  position:absolute;
+  left:0;right:0;
+  top:50%;
+  transform:translateY(-50%);
+  text-align:center;
+  font-size:14px;color:var(--text3);
+  pointer-events:none;
+  transition:top .16s ease,font-size .16s ease,color .16s ease,transform .16s ease;
+  font-family:'Inter',sans-serif;
+  font-weight:400;
+}
+/* Shrink label on focus / filled */
+.field input:focus ~ label,
+.field input:not(:placeholder-shown) ~ label{
+  top:8px;
+  transform:translateY(0);
+  font-size:10.5px;
+  color:var(--accent);
+  font-weight:600;
+  letter-spacing:.3px;
+  text-align:center;
+}
+.field input:focus{border-color:var(--border-focus);}
+
+/* Start btn */
+.btn-start{
+  width:100%;padding:14px;
+  background:var(--accent);
+  color:#fff;border:none;border-radius:10px;
+  font-family:'Inter',sans-serif;
+  font-size:15px;font-weight:600;
+  cursor:pointer;
+  transition:background .18s,transform .12s;
+}
+.btn-start:hover{background:var(--accent-h);}
+.btn-start:active{transform:scale(0.98);}
+
+/* ===== QUIZ ===== */
+#quiz.active{
+  display:block;
+  width:100%;max-width:620px;
+  margin:0 auto;
+  padding:36px 20px 80px;
+}
+
+/* Quiz header */
+.quiz-top{
+  display:flex;align-items:center;gap:11px;
+  margin-bottom:14px;
+}
+.quiz-logo-sm{
+  width:34px;height:34px;border-radius:8px;
+  background:var(--surface);border:1px solid var(--border);
+  overflow:hidden;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+}
+.quiz-logo-sm img{width:100%;height:100%;object-fit:contain;padding:4px;}
+.quiz-title{
+  font-family:'Playfair Display',serif;
+  font-size:1.1rem;font-weight:700;color:var(--text);line-height:1.2;
+}
+.quiz-sub-sm{font-size:11.5px;color:var(--text2);letter-spacing:.3px;text-transform:uppercase;margin-top:1px;}
+
+/* Student pill */
+.student-pill{
+  display:inline-flex;align-items:center;gap:6px;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:7px;padding:6px 11px;
+  font-size:12.5px;color:var(--text2);
+  margin-bottom:10px;
+}
+.student-pill strong{color:var(--text);font-weight:600;}
+.student-pill svg{width:13px;height:13px;flex-shrink:0;}
+
+/* Time row */
+.time-row{display:flex;gap:10px;margin-bottom:16px;}
+.time-box{
+  flex:1;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:8px;
+  padding:9px 13px;
+  display:flex;flex-direction:column;gap:2px;
+}
+.time-label{font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.4px;text-transform:uppercase;}
+.time-val{font-size:13.5px;color:var(--text);font-weight:600;}
+
+/* Progress */
+.prog-labels{
+  display:flex;justify-content:space-between;
+  font-size:11.5px;color:var(--text3);
+  margin-bottom:5px;
+}
+.prog-track{
+  height:3px;background:var(--prog-bg);
+  border-radius:99px;overflow:hidden;margin-bottom:24px;
+}
+.prog-fill{
+  height:100%;background:var(--accent);
+  border-radius:99px;
+  transition:width .4s cubic-bezier(.4,0,.2,1);
+  width:0%;
+}
+
+/* ===== QUESTION CARD ===== */
+.question-card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:11px;
+  padding:20px 18px;
+  margin-bottom:12px;
+  transition:border-color .2s,background .2s;
+}
+.question-card.answered{border-color:var(--accent);}
+.q-num{
+  font-size:10px;font-weight:700;letter-spacing:1.8px;
+  color:var(--text3);text-transform:uppercase;margin-bottom:7px;
+}
+.q-text{
+  font-size:14.5px;font-weight:600;color:var(--text);
+  line-height:1.55;margin-bottom:16px;
+}
+
+/* Options */
+.options{display:flex;flex-direction:column;gap:7px;}
+.opt{
+  display:flex;align-items:center;gap:11px;
+  padding:11px 13px;
+  border:1px solid var(--border);
+  border-radius:8px;
+  cursor:pointer;
+  transition:background .15s,border-color .15s;
+  background:var(--surface);
+  user-select:none;
+}
+.opt:hover{background:var(--opt-hover);border-color:var(--accent);}
+.opt.selected{background:var(--opt-sel-bg);border-color:var(--opt-sel-bd);}
+.opt input[type="radio"]{display:none;}
+.radio-c{
+  width:17px;height:17px;min-width:17px;
+  border:1.5px solid var(--border);
+  border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  transition:all .15s;flex-shrink:0;
+}
+.opt.selected .radio-c{border-color:var(--accent);background:var(--accent);}
+.rdot{width:6px;height:6px;background:#fff;border-radius:50%;opacity:0;transform:scale(0);transition:all .15s;}
+.opt.selected .rdot{opacity:1;transform:scale(1);}
+.opt-text{font-size:13.5px;color:var(--text);line-height:1.4;}
+
+/* ===== FINISH BTN ===== */
+.btn-finish{
+  width:100%;margin-top:20px;
+  padding:15px;
+  background:var(--finish-bg);
+  color:#fff;border:none;border-radius:10px;
+  font-family:'Inter',sans-serif;
+  font-size:14.5px;font-weight:600;
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  transition:background .18s,transform .12s;
+}
+.btn-finish:hover{background:var(--finish-h);}
+.btn-finish:active{transform:scale(0.98);}
+.btn-finish svg{width:17px;height:17px;}
+
+/* ===== TOAST ===== */
+#toast{
+  position:fixed;bottom:24px;left:50%;
+  transform:translateX(-50%) translateY(60px);
+  background:var(--text);color:var(--bg);
+  border-radius:9px;padding:10px 18px;
+  font-size:13px;font-weight:500;
+  box-shadow:0 2px 12px rgba(0,0,0,0.12);
+  transition:transform .3s cubic-bezier(.4,0,.2,1);
+  z-index:9999;white-space:nowrap;
+}
+#toast.show{transform:translateX(-50%) translateY(0);}
+
+/* ===== RESPONSIVE ===== */
+@media(max-width:480px){
+  .question-card{padding:16px 14px;}
+  .opt{padding:10px 11px;}
+  #quiz.active{padding:24px 14px 64px;}
+}
+</style>
+</head>
+<body>
+
+<button id="theme-btn" onclick="toggleTheme()" title="Cambiar tema">
+  <svg id="ti" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+  </svg>
+</button>
+
+<div id="toast"></div>
+
+<!-- ======== COVER ======== -->
+<div id="cover" class="screen active">
+  <div class="cover-inner">
+
+    <div class="cover-logo">
+      <img src="https://s.educacaoadventista.org.br/escola/conteudos/DEkFNtmxBWwO6oKynYon4lgonGA1COYLDJuEsxjW.png"
+           alt="Logo" onerror="this.parentElement.innerHTML='📚'">
+    </div>
+
+    <div class="cover-header">
+      <div class="cover-institution">Colegio Adventista</div>
+      <div class="cover-divider-top"></div>
+      <h1 class="cover-title">Examen Recuperatorio ETH</h1>
+      <div class="cover-subject">Anatomía</div>
+      <div class="cover-year">Gestión 2026</div>
+      <div class="cover-divider-bot"></div>
+    </div>
+
+    <div class="field">
+      <input type="text" id="student-name" placeholder="Nombre completo" autocomplete="off">
+      <label for="student-name">Nombre completo</label>
+    </div>
+
+    <button class="btn-start" onclick="startExam()">Iniciar Evaluación</button>
+  </div>
+</div>
+
+<!-- ======== QUIZ ======== -->
+<div id="quiz" class="screen">
+  <div class="quiz-top">
+    <div class="quiz-logo-sm">
+      <img src="https://s.educacaoadventista.org.br/escola/conteudos/DEkFNtmxBWwO6oKynYon4lgonGA1COYLDJuEsxjW.png"
+           alt="Logo" onerror="this.parentElement.innerHTML='📚'">
+    </div>
+    <div>
+      <div class="quiz-title">Examen Recuperatorio ETH</div>
+      <div class="quiz-sub-sm">Anatomía</div>
+    </div>
+  </div>
+
+  <div class="student-pill">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+    </svg>
+    <strong id="display-name"></strong>&nbsp;·&nbsp;<span id="display-date"></span>
+  </div>
+
+  <div class="time-row">
+    <div class="time-box">
+      <span class="time-label">Hora de inicio</span>
+      <span class="time-val" id="display-start">—</span>
+    </div>
+    <div class="time-box">
+      <span class="time-label">Hora de fin</span>
+      <span class="time-val" id="display-end">—</span>
+    </div>
+  </div>
+
+  <div class="prog-labels">
+    <span id="prog-text">0 respondidas</span>
+    <span id="prog-pct">0%</span>
+  </div>
+  <div class="prog-track">
+    <div class="prog-fill" id="prog-fill"></div>
+  </div>
+
+  <div id="questions-container"></div>
+
+  <button class="btn-finish" onclick="finishExam()">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+    </svg>
+    Finalizar Evaluación
+  </button>
+</div>
+
+<script>
+/* =====================================================
+   ✏️  BANCO DE PREGUNTAS
+   Agrega o quita preguntas aquí libremente.
+   Marca correct:true en la respuesta correcta de cada pregunta.
+===================================================== */
+const BANCO = [
+  {
+    text: "¿Cuál es la unidad básica y funcional de todos los seres vivos?",
+    options: [
+      { text: "El tejido",   correct: false },
+      { text: "La célula",   correct: true  },
+      { text: "El órgano",   correct: false },
+      { text: "El átomo",    correct: false },
+    ]
+  },
+  {
+    text: "¿Qué estructura celular contiene el material genético (ADN) en una célula eucariota?",
+    options: [
+      { text: "La membrana plasmática", correct: false },
+      { text: "El ribosoma",            correct: false },
+      { text: "El núcleo",              correct: true  },
+      { text: "La mitocondria",         correct: false },
+    ]
+  },
+  {
+    text: "¿Cómo se llama el proceso por el cual las células se dividen para producir dos células hijas idénticas?",
+    options: [
+      { text: "Meiosis",      correct: false },
+      { text: "Mitosis",      correct: true  },
+      { text: "Fotosíntesis", correct: false },
+      { text: "Osmosis",      correct: false },
+    ]
+  },
+  {
+    text: "¿Cuál es la función principal de la membrana plasmática?",
+    options: [
+      { text: "Producir energía para la célula",                               correct: false },
+      { text: "Sintetizar proteínas",                                           correct: false },
+      { text: "Regular el paso de sustancias hacia dentro y fuera de la célula", correct: true  },
+      { text: "Almacenar el material genético",                                 correct: false },
+    ]
+  },
+  {
+    text: "¿Qué organelo celular es conocido como la 'central energética' de la célula?",
+    options: [
+      { text: "El retículo endoplasmático", correct: false },
+      { text: "El aparato de Golgi",        correct: false },
+      { text: "El cloroplasto",             correct: false },
+      { text: "La mitocondria",             correct: true  },
+    ]
+  },
+  {
+    text: "¿Cuál es la diferencia principal entre una célula procariota y una eucariota?",
+    options: [
+      { text: "La procariota tiene núcleo definido y la eucariota no",  correct: false },
+      { text: "La eucariota tiene núcleo definido y la procariota no",  correct: true  },
+      { text: "La procariota es más grande que la eucariota",           correct: false },
+      { text: "Solo las procariotas tienen membrana celular",           correct: false },
+    ]
+  },
+  {
+    text: "¿Qué organelo celular es exclusivo de las células vegetales y realiza la fotosíntesis?",
+    options: [
+      { text: "La mitocondria", correct: false },
+      { text: "El ribosoma",    correct: false },
+      { text: "El lisosoma",    correct: false },
+      { text: "El cloroplasto", correct: true  },
+    ]
+  },
+  {
+    text: "¿Cuál es la función de los ribosomas en la célula?",
+    options: [
+      { text: "Producir energía (ATP)",        correct: false },
+      { text: "Sintetizar proteínas",          correct: true  },
+      { text: "Almacenar agua y nutrientes",  correct: false },
+      { text: "Destruir organismos extraños", correct: false },
+    ]
+  },
+  {
+    text: "¿Qué teoría afirma que todos los organismos están compuestos por células y que toda célula proviene de otra célula?",
+    options: [
+      { text: "Teoría de la evolución", correct: false },
+      { text: "Teoría atómica",         correct: false },
+      { text: "Teoría celular",         correct: true  },
+      { text: "Teoría génica",          correct: false },
+    ]
+  },
+];
+
+/* =====================================================
+   ✏️  CANTIDAD DE PREGUNTAS POR EXAMEN
+   Cambia este número para mostrar más o menos preguntas.
+   No puede ser mayor que el total de preguntas en BANCO.
+===================================================== */
+const N_QUESTIONS = 3;
+
+/* =====================================================
+   ✏️  NÚMERO DEL DOCENTE
+===================================================== */
+const PHONE = '78787878';
+
+/* === STATE === */
+let currentQuestions = [], studentName = '', startTime = null, endTime = null, answers = {};
+
+/* === THEME === */
+function toggleTheme() {
+  const h = document.documentElement;
+  const dark = h.getAttribute('data-theme') === 'dark';
+  h.setAttribute('data-theme', dark ? 'light' : 'dark');
+  document.getElementById('ti').innerHTML = dark
+    ? '<path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>'
+    : '<circle cx="12" cy="12" r="5"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72 1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>';
+}
+
+/* === SECURITY === */
+document.addEventListener('contextmenu', e => e.preventDefault());
+document.addEventListener('keydown', e => {
+  if (e.key === 'F12' || (e.ctrlKey && 'uUsScCaA'.includes(e.key))) e.preventDefault();
+});
+
+/* === TOAST === */
+function toast(msg, d = 2800) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), d);
+}
+
+/* === SHUFFLE & PICK N === */
+function shuffle(a) {
+  const r = [...a];
+  for (let i = r.length - 1; i > 0; i--) {
+    const j = 0 | Math.random() * (i + 1);
+    [r[i], r[j]] = [r[j], r[i]];
+  }
+  return r;
+}
+
+function pickN(arr, n) {
+  return shuffle(arr).slice(0, Math.min(n, arr.length));
+}
+
+/* === START === */
+function startExam() {
+  const v = document.getElementById('student-name').value.trim();
+  if (v.length < 3) { toast('⚠️ Ingresa tu nombre completo.'); document.getElementById('student-name').focus(); return; }
+  studentName = v;
+  startTime = new Date();
+  endTime = null;
+  answers = {};
+
+  // Pick N unique random questions and shuffle their options
+  currentQuestions = pickN(BANCO, N_QUESTIONS).map(q => ({ ...q, options: shuffle(q.options) }));
+
+  document.getElementById('display-name').textContent = studentName;
+  document.getElementById('display-date').textContent = startTime.toLocaleDateString('es-BO', { day: '2-digit', month: 'short', year: 'numeric' });
+  document.getElementById('display-start').textContent = startTime.toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  document.getElementById('display-end').textContent = '—';
+
+  renderQuestions();
+  updateProgress();
+
+  document.getElementById('cover').classList.remove('active');
+  document.getElementById('quiz').classList.add('active');
+  window.scrollTo(0, 0);
+}
+
+/* === RENDER === */
+function renderQuestions() {
+  const c = document.getElementById('questions-container'); c.innerHTML = '';
+  currentQuestions.forEach((q, qi) => {
+    const d = document.createElement('div');
+    d.className = 'question-card'; d.id = `qc${qi}`;
+    d.innerHTML = `
+      <div class="q-num">Pregunta ${qi + 1} de ${currentQuestions.length}</div>
+      <div class="q-text">${q.text}</div>
+      <div class="options">
+        ${q.options.map((o, oi) => `
+          <label class="opt" id="opt-${qi}-${oi}" onclick="pick(${qi},${oi})">
+            <input type="radio" name="q${qi}" value="${oi}">
+            <span class="radio-c"><span class="rdot"></span></span>
+            <span class="opt-text">${o.text}</span>
+          </label>`).join('')}
+      </div>`;
+    c.appendChild(d);
+  });
+}
+
+/* === PICK === */
+function pick(qi, oi) {
+  currentQuestions[qi].options.forEach((_, i) => document.getElementById(`opt-${qi}-${i}`)?.classList.remove('selected'));
+  document.getElementById(`opt-${qi}-${oi}`)?.classList.add('selected');
+  const card = document.getElementById(`qc${qi}`);
+  if (card) { card.classList.add('answered'); card.style.borderColor = ''; card.style.background = ''; }
+  answers[qi] = oi;
+  updateProgress();
+}
+
+/* === PROGRESS === */
+function updateProgress() {
+  const total = currentQuestions.length, done = Object.keys(answers).length;
+  const pct = total ? (done / total) * 100 : 0;
+  document.getElementById('prog-fill').style.width = pct + '%';
+  document.getElementById('prog-text').textContent = `${done} de ${total} respondidas`;
+  document.getElementById('prog-pct').textContent = Math.round(pct) + '%';
+}
+
+/* === FINISH === */
+function finishExam() {
+  const total = currentQuestions.length, done = Object.keys(answers).length;
+  if (done < total) {
+    let firstUnanswered = null;
+    currentQuestions.forEach((_, qi) => {
+      const card = document.getElementById(`qc${qi}`);
+      if (card && answers[qi] === undefined) {
+        card.style.borderColor = '#ef4444';
+        card.style.background = 'rgba(239,68,68,0.04)';
+        if (!firstUnanswered) firstUnanswered = card;
+      }
+    });
+    if (firstUnanswered) firstUnanswered.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    toast(`⚠️ Debes responder todas las preguntas (faltan ${total - done}).`);
+    return;
+  }
+  endTime = new Date();
+  document.getElementById('display-end').textContent = endTime.toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  saveToFirebase();
+  generatePDF();
+}
+
+/* === GUARDAR EN FIREBASE === */
+async function saveToFirebase() {
+  try {
+    if (!window._db) {
+      console.warn('Firebase aún no está listo.');
+      toast('⚠️ Firebase no configurado.');
+      return;
+    }
+    // Calcular puntaje
+    let correctas = 0;
+    const detalle = currentQuestions.map((q, qi) => {
+      const sel = q.options[answers[qi]];
+      const ok  = !!(sel && sel.correct);
+      if (ok) correctas++;
+      return {
+        pregunta: q.text,
+        respuesta: sel ? sel.text : null,
+        correcta: ok
+      };
+    });
+
+    const payload = {
+      nombre:      studentName,
+      correctas:   correctas,
+      total:       currentQuestions.length,
+      horaInicio:  startTime.toISOString(),
+      horaFin:     endTime.toISOString(),
+      fecha:       startTime.toLocaleDateString('es-BO', { day: '2-digit', month: 'short', year: 'numeric' }),
+      detalle:     detalle,
+      guardadoEn:  window._serverTimestamp()
+    };
+
+    await window._addDoc(window._collection(window._db, 'resultados'), payload);
+    toast('✅ Resultado enviado al docente.');
+  } catch (err) {
+    console.error('Error guardando en Firebase:', err);
+    toast('⚠️ No se pudo enviar el resultado.');
+  }
+}
+
+/* === PDF === */
+function generatePDF() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const W = 210, H = 297, M = 22; let y = M;
+
+  const blue  = [26, 115, 232];
+  const dark  = [28, 30, 33];
+  const gray  = [100, 110, 125];
+  const green = [22, 163, 74],  greenBg = [240, 253, 244], greenBd = [187, 247, 208];
+  const red   = [220, 38, 38],  redBg   = [254, 242, 242], redBd   = [254, 202, 202];
+
+  // Header bar
+  doc.setFillColor(...blue); doc.rect(0, 0, W, 11, 'F');
+  doc.setFontSize(7); doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold');
+  doc.text('EVALUACIÓN FINAL — BIOLOGÍA: LAS CÉLULAS', M, 7.5);
+  y = 22;
+
+  // Title block
+  doc.setFontSize(7); doc.setTextColor(...gray); doc.setFont('helvetica', 'normal');
+  doc.text('COLEGIO ADVENTISTA', W / 2, y, { align: 'center' }); y += 6;
+  doc.setFontSize(18); doc.setTextColor(...dark); doc.setFont('helvetica', 'bold');
+  doc.text('Evaluación Final', W / 2, y, { align: 'center' }); y += 6;
+  doc.setFontSize(9); doc.setTextColor(...gray); doc.setFont('helvetica', 'normal');
+  doc.text('Biología · Las Células · Gestión 2025', W / 2, y, { align: 'center' }); y += 7;
+  doc.setDrawColor(...blue); doc.setLineWidth(0.45);
+  doc.line(M, y, W - M, y); y += 7;
+
+  // Student info box
+  doc.setFillColor(247, 248, 250);
+  doc.roundedRect(M, y, W - 2 * M, 27, 2.5, 2.5, 'F');
+  doc.setFontSize(9); doc.setTextColor(...dark); doc.setFont('helvetica', 'bold');
+  doc.text('Estudiante:', M + 5, y + 6.5); doc.setFont('helvetica', 'normal');
+  doc.text(studentName, M + 27, y + 6.5);
+
+  doc.setFont('helvetica', 'bold'); doc.text('Fecha:', M + 5, y + 13.5); doc.setFont('helvetica', 'normal');
+  doc.text(startTime.toLocaleDateString('es-BO', { day: '2-digit', month: 'long', year: 'numeric' }), M + 21, y + 13.5);
+
+  const colW = (W - 2 * M - 10) / 2;
+  doc.setFont('helvetica', 'bold'); doc.setTextColor(...blue);
+  doc.text('Hora Inicio:', M + 5, y + 21); doc.setFont('helvetica', 'normal'); doc.setTextColor(...dark);
+  doc.text(startTime.toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit', second: '2-digit' }), M + 28, y + 21);
+  doc.setFont('helvetica', 'bold'); doc.setTextColor(...blue);
+  doc.text('Hora Fin:', M + colW + 8, y + 21); doc.setFont('helvetica', 'normal'); doc.setTextColor(...dark);
+  doc.text(endTime ? endTime.toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—', M + colW + 27, y + 21);
+  y += 34;
+
+  // Questions
+  currentQuestions.forEach((q, qi) => {
+    if (y > H - 48) { doc.addPage(); y = M; }
+    const sel = q.options[answers[qi]];
+    const isCorrect = sel && sel.correct;
+    const ansColor = isCorrect ? green : red;
+    const ansBg    = isCorrect ? greenBg : redBg;
+    const ansBd    = isCorrect ? greenBd : redBd;
+
+    // Number chip
+    doc.setFillColor(...blue); doc.roundedRect(M, y, 6.5, 6.5, 1.2, 1.2, 'F');
+    doc.setFontSize(7); doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold');
+    doc.text(`${qi + 1}`, M + 3.25, y + 4.8, { align: 'center' });
+
+    // Question text
+    doc.setFontSize(9.5); doc.setTextColor(...dark); doc.setFont('helvetica', 'bold');
+    const qL = doc.splitTextToSize(q.text, W - 2 * M - 10);
+    doc.text(qL, M + 9, y + 5); y += qL.length * 4.8 + 5;
+
+    // Answer box (green = correct, red = incorrect)
+    const at = `${isCorrect ? '✓' : '✗'}  ${sel ? sel.text : '(Sin respuesta)'}`;
+    const aL = doc.splitTextToSize(at, W - 2 * M - 8);
+    const bh = aL.length * 4.8 + 8;
+    doc.setFillColor(...ansBg);
+    doc.roundedRect(M + 5, y, W - 2 * M - 5, bh, 2, 2, 'F');
+    doc.setDrawColor(...ansBd); doc.setLineWidth(0.4);
+    doc.roundedRect(M + 5, y, W - 2 * M - 5, bh, 2, 2, 'S');
+    doc.setFontSize(9); doc.setTextColor(...ansColor); doc.setFont('helvetica', 'bold');
+    doc.text(aL, M + 10, y + 5.5);
+    y += bh + 8;
+  });
+
+  // Footer
+  if (y > H - 22) { doc.addPage(); y = M; }
+  doc.setDrawColor(...blue); doc.setLineWidth(0.35);
+  doc.line(M, y, W - M, y); y += 6;
+  doc.setFontSize(8); doc.setTextColor(...gray); doc.setFont('helvetica', 'normal');
+  doc.text('Envía este PDF al número del docente:', M, y); y += 5;
+  doc.setFontSize(12); doc.setTextColor(...blue); doc.setFont('helvetica', 'bold');
+  doc.text(PHONE, M, y);
+
+  const safe = studentName.replace(/\s+/g, '-').toLowerCase();
+  doc.save(`evaluacion-${safe}.pdf`);
+  toast('✅ PDF descargado correctamente.');
+}
+</script>
+</body>
+</html>
