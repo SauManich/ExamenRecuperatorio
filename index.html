@@ -3,10 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Evaluación Final – Las Células</title>
+<title>Evaluación Trimestral</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-
 <!-- 🔥 Firebase: expone helpers en window para usarlos desde el script clásico -->
 <script type="module">
   import { db } from "./js/firebase-config.js";
@@ -221,6 +219,39 @@ body{
 }
 .btn-start:hover{background:var(--accent-h);}
 .btn-start:active{transform:scale(0.98);}
+.btn-start:disabled{background:var(--border);color:var(--text3);cursor:not-allowed;transform:none;}
+.btn-start:disabled:hover{background:var(--border);}
+
+/* Row + select */
+.field-row{display:flex;gap:10px;width:100%;margin-bottom:14px;}
+.field-static{
+  flex:1;
+  display:flex;flex-direction:column;justify-content:center;align-items:center;
+  border:1.5px solid var(--border);
+  border-radius:10px;
+  background:var(--surface);
+  padding:8px 10px;
+}
+.field-static-label{font-size:10.5px;color:var(--accent);font-weight:600;letter-spacing:.3px;}
+.field-static-value{font-size:14px;color:var(--text);font-weight:600;margin-top:2px;}
+.field-select{flex:1;margin-bottom:0;}
+.field-select select{
+  width:100%;padding:20px 14px 8px;
+  border:1.5px solid var(--border);border-radius:10px;
+  background:transparent;color:var(--text);
+  font-family:'Inter',sans-serif;font-size:15px;font-weight:500;
+  text-align:center;text-align-last:center;
+  outline:none;cursor:pointer;
+  appearance:none;-webkit-appearance:none;
+  transition:border-color .2s;
+}
+.field-select select:focus{border-color:var(--border-focus);}
+.field-select .select-label{
+  position:absolute;left:0;right:0;top:8px;
+  text-align:center;font-size:10.5px;
+  color:var(--accent);font-weight:600;letter-spacing:.3px;
+  pointer-events:none;
+}
 
 /* ===== QUIZ ===== */
 #quiz.active{
@@ -272,6 +303,23 @@ body{
 }
 .time-label{font-size:10px;color:var(--text3);font-weight:600;letter-spacing:.4px;text-transform:uppercase;}
 .time-val{font-size:13.5px;color:var(--text);font-weight:600;}
+
+/* Timer states */
+.time-box-timer{transition:background .25s,border-color .25s;}
+.time-box-timer .time-val{font-variant-numeric:tabular-nums;letter-spacing:.5px;}
+.time-box-timer.warn{background:#fffbeb;border-color:#fde68a;}
+.time-box-timer.warn .time-val,
+.time-box-timer.warn .time-label{color:#b45309;}
+.time-box-timer.danger{background:#fef2f2;border-color:#fecaca;animation:pulseTimer 1s ease-in-out infinite;}
+.time-box-timer.danger .time-val,
+.time-box-timer.danger .time-label{color:#dc2626;}
+[data-theme="dark"] .time-box-timer.warn{background:#1c1100;border-color:#78350f;}
+[data-theme="dark"] .time-box-timer.warn .time-val,
+[data-theme="dark"] .time-box-timer.warn .time-label{color:#fcd34d;}
+[data-theme="dark"] .time-box-timer.danger{background:#450a0a;border-color:#7f1d1d;}
+[data-theme="dark"] .time-box-timer.danger .time-val,
+[data-theme="dark"] .time-box-timer.danger .time-label{color:#f87171;}
+@keyframes pulseTimer{0%,100%{opacity:1}50%{opacity:.7}}
 
 /* Progress */
 .prog-labels{
@@ -402,11 +450,32 @@ body{
     </div>
 
     <div class="field">
-      <input type="text" id="student-name" placeholder="Nombre completo" autocomplete="off">
-      <label for="student-name">Nombre completo</label>
+      <input type="text" id="student-name" placeholder="Nombre" autocomplete="off" oninput="checkForm()">
+      <label for="student-name">Nombre</label>
     </div>
 
-    <button class="btn-start" onclick="startExam()">Iniciar Evaluación</button>
+    <div class="field">
+      <input type="text" id="student-lastname" placeholder="Apellidos" autocomplete="off" oninput="checkForm()">
+      <label for="student-lastname">Apellidos</label>
+    </div>
+
+    <div class="field-row">
+      <div class="field-static">
+        <span class="field-static-label">Curso</span>
+        <span class="field-static-value">5to Secundaria</span>
+      </div>
+      <div class="field field-select">
+        <select id="student-parallel" onchange="checkForm()">
+          <option value="" disabled selected></option>
+          <option value="A">A</option>
+          <option value="B">B</option>
+          <option value="C">C</option>
+        </select>
+        <label for="student-parallel" class="select-label">Paralelo</label>
+      </div>
+    </div>
+
+    <button class="btn-start" id="btn-start" onclick="startExam()" disabled>Iniciar Evaluación</button>
   </div>
 </div>
 
@@ -434,6 +503,10 @@ body{
     <div class="time-box">
       <span class="time-label">Hora de inicio</span>
       <span class="time-val" id="display-start">—</span>
+    </div>
+    <div class="time-box time-box-timer" id="timer-box">
+      <span class="time-label">Tiempo restante</span>
+      <span class="time-val" id="display-timer">05:00</span>
     </div>
     <div class="time-box">
       <span class="time-label">Hora de fin</span>
@@ -467,86 +540,305 @@ body{
 ===================================================== */
 const BANCO = [
   {
-    text: "¿Cuál es la unidad básica y funcional de todos los seres vivos?",
-    options: [
-      { text: "El tejido",   correct: false },
-      { text: "La célula",   correct: true  },
-      { text: "El órgano",   correct: false },
-      { text: "El átomo",    correct: false },
+    "text": "¿Qué plano divide el cuerpo en derecha e izquierda?",
+    "options": [
+      { "text": "Frontal", "correct": false },
+      { "text": "Transversal", "correct": false },
+      { "text": "Sagital", "correct": true },
+      { "text": "Oblicuo", "correct": false },
+      { "text": "Horizontal", "correct": false }
     ]
   },
   {
-    text: "¿Qué estructura celular contiene el material genético (ADN) en una célula eucariota?",
-    options: [
-      { text: "La membrana plasmática", correct: false },
-      { text: "El ribosoma",            correct: false },
-      { text: "El núcleo",              correct: true  },
-      { text: "La mitocondria",         correct: false },
+    "text": "El plano transversal divide el cuerpo en:",
+    "options": [
+      { "text": "Superior e inferior", "correct": true },
+      { "text": "Derecha e izquierda", "correct": false },
+      { "text": "Anterior y posterior", "correct": false },
+      { "text": "Mitad y lateral", "correct": false },
+      { "text": "Interno y externo", "correct": false }
     ]
   },
   {
-    text: "¿Cómo se llama el proceso por el cual las células se dividen para producir dos células hijas idénticas?",
-    options: [
-      { text: "Meiosis",      correct: false },
-      { text: "Mitosis",      correct: true  },
-      { text: "Fotosíntesis", correct: false },
-      { text: "Osmosis",      correct: false },
+    "text": "El nivel tisular está formado por:",
+    "options": [
+      { "text": "Células similares", "correct": true },
+      { "text": "Órganos", "correct": false },
+      { "text": "Sistemas", "correct": false },
+      { "text": "Moléculas", "correct": false },
+      { "text": "Aparatos", "correct": false }
     ]
   },
   {
-    text: "¿Cuál es la función principal de la membrana plasmática?",
-    options: [
-      { text: "Producir energía para la célula",                               correct: false },
-      { text: "Sintetizar proteínas",                                           correct: false },
-      { text: "Regular el paso de sustancias hacia dentro y fuera de la célula", correct: true  },
-      { text: "Almacenar el material genético",                                 correct: false },
+    "text": "La célula es:",
+    "options": [
+      { "text": "Nivel más alto", "correct": false },
+      { "text": "Unidad estructural y funcional", "correct": true },
+      { "text": "Un órgano", "correct": false },
+      { "text": "Un tejido", "correct": false },
+      { "text": "Un sistema", "correct": false }
     ]
   },
   {
-    text: "¿Qué organelo celular es conocido como la 'central energética' de la célula?",
-    options: [
-      { text: "El retículo endoplasmático", correct: false },
-      { text: "El aparato de Golgi",        correct: false },
-      { text: "El cloroplasto",             correct: false },
-      { text: "La mitocondria",             correct: true  },
+    "text": "¿Cuál es el nivel más complejo?",
+    "options": [
+      { "text": "Químico", "correct": false },
+      { "text": "Celular", "correct": false },
+      { "text": "Tisular", "correct": false },
+      { "text": "Órgano", "correct": false },
+      { "text": "Organismo", "correct": true }
     ]
   },
   {
-    text: "¿Cuál es la diferencia principal entre una célula procariota y una eucariota?",
-    options: [
-      { text: "La procariota tiene núcleo definido y la eucariota no",  correct: false },
-      { text: "La eucariota tiene núcleo definido y la procariota no",  correct: true  },
-      { text: "La procariota es más grande que la eucariota",           correct: false },
-      { text: "Solo las procariotas tienen membrana celular",           correct: false },
+    "text": "Un sistema está formado por:",
+    "options": [
+      { "text": "Órganos similares", "correct": true },
+      { "text": "Tejidos", "correct": false },
+      { "text": "Células", "correct": false },
+      { "text": "Órganos parecidos", "correct": false },
+      { "text": "Moléculas", "correct": false }
     ]
   },
   {
-    text: "¿Qué organelo celular es exclusivo de las células vegetales y realiza la fotosíntesis?",
-    options: [
-      { text: "La mitocondria", correct: false },
-      { text: "El ribosoma",    correct: false },
-      { text: "El lisosoma",    correct: false },
-      { text: "El cloroplasto", correct: true  },
+    "text": "Toda la parte digestiva es un:",
+    "options": [
+      { "text": "Sistema", "correct": false },
+      { "text": "Órgano", "correct": false },
+      { "text": "Aparato", "correct": true },
+      { "text": "Tejido", "correct": false },
+      { "text": "Nivel celular", "correct": false }
     ]
   },
   {
-    text: "¿Cuál es la función de los ribosomas en la célula?",
-    options: [
-      { text: "Producir energía (ATP)",        correct: false },
-      { text: "Sintetizar proteínas",          correct: true  },
-      { text: "Almacenar agua y nutrientes",  correct: false },
-      { text: "Destruir organismos extraños", correct: false },
+    "text": "Las articulaciones inmóviles se llaman:",
+    "options": [
+      { "text": "Diartrosis", "correct": false },
+      { "text": "Anfiartrosis", "correct": false },
+      { "text": "Sinartrosis", "correct": true },
+      { "text": "Fibrosas móviles", "correct": false },
+      { "text": "Cartilaginosas móviles", "correct": false }
     ]
   },
   {
-    text: "¿Qué teoría afirma que todos los organismos están compuestos por células y que toda célula proviene de otra célula?",
-    options: [
-      { text: "Teoría de la evolución", correct: false },
-      { text: "Teoría atómica",         correct: false },
-      { text: "Teoría celular",         correct: true  },
-      { text: "Teoría génica",          correct: false },
+    "text": "Ejemplo de articulación móvil:",
+    "options": [
+      { "text": "Cráneo", "correct": false },
+      { "text": "Suturas", "correct": false },
+      { "text": "Rodilla", "correct": true },
+      { "text": "Dientes", "correct": false },
+      { "text": "Costillas", "correct": false }
     ]
   },
+  {
+    "text": "El cráneo pertenece al:",
+    "options": [
+      { "text": "Esqueleto apendicular", "correct": false },
+      { "text": "Esqueleto axial", "correct": true },
+      { "text": "Sistema muscular", "correct": false },
+      { "text": "Sistema nervioso", "correct": false },
+      { "text": "Aparato locomotor", "correct": false }
+    ]
+  },
+  {
+    "text": "¿Cuál pertenece al esqueleto axial?",
+    "options": [
+      { "text": "Fémur", "correct": false },
+      { "text": "Húmero", "correct": false },
+      { "text": "Esternon", "correct": true },
+      { "text": "Radio", "correct": false },
+      { "text": "Tibia", "correct": false }
+    ]
+  },
+  {
+    "text": "¿Cuál pertenece al esqueleto apendicular?",
+    "options": [
+      { "text": "Costillas", "correct": false },
+      { "text": "Esternón", "correct": false },
+      { "text": "Vértebras", "correct": false },
+      { "text": "Clavícula", "correct": true },
+      { "text": "Cráneo", "correct": false }
+    ]
+  },
+  {
+    "text": "Un hueso largo es:",
+    "options": [
+      { "text": "Escápula", "correct": false },
+      { "text": "Vértebra", "correct": false },
+      { "text": "Fémur", "correct": true },
+      { "text": "Costilla", "correct": false },
+      { "text": "Cráneo", "correct": false }
+    ]
+  },
+  {
+    "text": "Hueso plano:",
+    "options": [
+      { "text": "Fémur", "correct": false },
+      { "text": "Húmero", "correct": false },
+      { "text": "Esternón", "correct": true },
+      { "text": "Tibia", "correct": false },
+      { "text": "Radio", "correct": false }
+    ]
+  },
+  {
+    "text": "Hueso irregular:",
+    "options": [
+      { "text": "Cráneo", "correct": false },
+      { "text": "Vértebra", "correct": true },
+      { "text": "Fémur", "correct": false },
+      { "text": "Clavícula", "correct": false },
+      { "text": "Falange", "correct": false }
+    ]
+  },
+  {
+    "text": "Los huesos sesamoideos se encuentran en:",
+    "options": [
+      { "text": "Cráneo", "correct": false },
+      { "text": "Mano", "correct": false },
+      { "text": "Rodilla", "correct": true },
+      { "text": "Columna", "correct": false },
+      { "text": "Tórax", "correct": false }
+    ]
+  },
+  {
+    "text": "Función del sistema óseo:",
+    "options": [
+      { "text": "Respiración", "correct": false },
+      { "text": "Digestión", "correct": false },
+      { "text": "Protección", "correct": true },
+      { "text": "Filtración", "correct": false },
+      { "text": "Absorción", "correct": false }
+    ]
+  },
+  {
+    "text": "Los vasos sanguíneos son:",
+    "options": [
+      { "text": "Nervios", "correct": false },
+      { "text": "Arterias, venas y capilares", "correct": true },
+      { "text": "Bronquios", "correct": false },
+      { "text": "Músculos", "correct": false },
+      { "text": "Tejidos", "correct": false }
+    ]
+  },
+  {
+    "text": "Las arterias transportan sangre:",
+    "options": [
+      { "text": "Al corazón", "correct": false },
+      { "text": "Desde el corazón", "correct": true },
+      { "text": "Solo oxigenada", "correct": false },
+      { "text": "Solo venosa", "correct": false },
+      { "text": "Solo linfa", "correct": false }
+    ]
+  },
+  {
+    "text": "Las venas llevan sangre:",
+    "options": [
+      { "text": "Fuera del cuerpo", "correct": false },
+      { "text": "Desde el corazón", "correct": false },
+      { "text": "Hacia el corazón", "correct": true },
+      { "text": "Solo oxigenada", "correct": false },
+      { "text": "A los pulmones", "correct": false }
+    ]
+  },
+  {
+    "text": "Los capilares permiten:",
+    "options": [
+      { "text": "Movimiento", "correct": false },
+      { "text": "Digestión", "correct": false },
+      { "text": "Intercambio de sustancias", "correct": true },
+      { "text": "Protección", "correct": false },
+      { "text": "Filtración renal", "correct": false }
+    ]
+  },
+  {
+    "text": "Una herida incisa es:",
+    "options": [
+      { "text": "Por golpe", "correct": false },
+      { "text": "Por raspadura", "correct": false },
+      { "text": "Por objeto cortante", "correct": true },
+      { "text": "Por arma de fuego", "correct": false },
+      { "text": "Por presión", "correct": false }
+    ]
+  },
+  {
+    "text": "Una herida punzante es causada por:",
+    "options": [
+      { "text": "Caída", "correct": false },
+      { "text": "Objeto puntiagudo", "correct": true },
+      { "text": "Raspadura", "correct": false },
+      { "text": "Corte amplio", "correct": false },
+      { "text": "Fricción", "correct": false }
+    ]
+  },
+  {
+    "text": "La herida abrasiva es:",
+    "options": [
+      { "text": "Profunda", "correct": false },
+      { "text": "Cortante", "correct": false },
+      { "text": "Superficial", "correct": true },
+      { "text": "Punzante", "correct": false },
+      { "text": "Quirúrgica", "correct": false }
+    ]
+  },
+  {
+    "text": "El punto simple se usa en heridas:",
+    "options": [
+      { "text": "Profundas", "correct": false },
+      { "text": "Infectadas", "correct": false },
+      { "text": "Superficiales", "correct": true },
+      { "text": "Internas", "correct": false },
+      { "text": "Óseas", "correct": false }
+    ]
+  },
+  {
+    "text": "El sistema nervioso controla:",
+    "options": [
+      { "text": "Digestión", "correct": false },
+      { "text": "Movimiento y coordinación", "correct": true },
+      { "text": "Filtración", "correct": false },
+      { "text": "Producción ósea", "correct": false },
+      { "text": "Circulación", "correct": false }
+    ]
+  },
+  {
+    "text": "El aparato respiratorio se encarga de:",
+    "options": [
+      { "text": "Transporte", "correct": false },
+      { "text": "Intercambio gaseoso", "correct": true },
+      { "text": "Digestión", "correct": false },
+      { "text": "Protección", "correct": false },
+      { "text": "Eliminación", "correct": false }
+    ]
+  },
+  {
+    "text": "El aparato circulatorio transporta:",
+    "options": [
+      { "text": "Hormonas solamente", "correct": false },
+      { "text": "Aire", "correct": false },
+      { "text": "Sangre", "correct": true },
+      { "text": "Alimentos", "correct": false },
+      { "text": "Bilis", "correct": false }
+    ]
+  },
+  {
+    "text": "El tejido muscular permite:",
+    "options": [
+      { "text": "Pensar", "correct": false },
+      { "text": "Protección", "correct": false },
+      { "text": "Movimiento", "correct": true },
+      { "text": "Digestión", "correct": false },
+      { "text": "Respiración", "correct": false }
+    ]
+  },
+  {
+    "text": "El organismo es:",
+    "options": [
+      { "text": "Un órgano", "correct": false },
+      { "text": "Un sistema", "correct": false },
+      { "text": "Nivel más alto de organización", "correct": true },
+      { "text": "Un tejido", "correct": false },
+      { "text": "Nivel químico", "correct": false }
+    ]
+  }
 ];
 
 /* =====================================================
@@ -554,15 +846,21 @@ const BANCO = [
    Cambia este número para mostrar más o menos preguntas.
    No puede ser mayor que el total de preguntas en BANCO.
 ===================================================== */
-const N_QUESTIONS = 3;
+const N_QUESTIONS = 10;
 
 /* =====================================================
    ✏️  NÚMERO DEL DOCENTE
 ===================================================== */
 const PHONE = '78787878';
 
+/* =====================================================
+   ⏱️  DURACIÓN DEL EXAMEN (en segundos)
+===================================================== */
+const EXAM_DURATION = 5 * 60; // 5 minutos
+
 /* === STATE === */
 let currentQuestions = [], studentName = '', startTime = null, endTime = null, answers = {};
+let timerInterval = null, timeLeft = 0, examFinished = false;
 
 /* === THEME === */
 function toggleTheme() {
@@ -601,11 +899,29 @@ function pickN(arr, n) {
   return shuffle(arr).slice(0, Math.min(n, arr.length));
 }
 
+/* === FORM VALIDATION === */
+function checkForm() {
+  const n = document.getElementById('student-name').value.trim();
+  const a = document.getElementById('student-lastname').value.trim();
+  const p = document.getElementById('student-parallel').value;
+  const ok = n.length >= 2 && a.length >= 2 && (p === 'A' || p === 'B' || p === 'C');
+  document.getElementById('btn-start').disabled = !ok;
+}
+
+/* === STATE EXTRA === */
+let studentLastname = '', studentParallel = '';
+
 /* === START === */
 function startExam() {
-  const v = document.getElementById('student-name').value.trim();
-  if (v.length < 3) { toast('⚠️ Ingresa tu nombre completo.'); document.getElementById('student-name').focus(); return; }
-  studentName = v;
+  const n = document.getElementById('student-name').value.trim();
+  const a = document.getElementById('student-lastname').value.trim();
+  const p = document.getElementById('student-parallel').value;
+  if (n.length < 2 || a.length < 2 || !['A','B','C'].includes(p)) {
+    toast('⚠️ Completa todos los campos.'); return;
+  }
+  studentName = n;
+  studentLastname = a;
+  studentParallel = p;
   startTime = new Date();
   endTime = null;
   answers = {};
@@ -613,7 +929,7 @@ function startExam() {
   // Pick N unique random questions and shuffle their options
   currentQuestions = pickN(BANCO, N_QUESTIONS).map(q => ({ ...q, options: shuffle(q.options) }));
 
-  document.getElementById('display-name').textContent = studentName;
+  document.getElementById('display-name').textContent = `${studentName} ${studentLastname} · 5to ${studentParallel}`;
   document.getElementById('display-date').textContent = startTime.toLocaleDateString('es-BO', { day: '2-digit', month: 'short', year: 'numeric' });
   document.getElementById('display-start').textContent = startTime.toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   document.getElementById('display-end').textContent = '—';
@@ -624,6 +940,42 @@ function startExam() {
   document.getElementById('cover').classList.remove('active');
   document.getElementById('quiz').classList.add('active');
   window.scrollTo(0, 0);
+
+  startTimer();
+}
+
+/* === TIMER === */
+function startTimer() {
+  timeLeft = EXAM_DURATION;
+  examFinished = false;
+  updateTimerDisplay();
+  if (timerInterval) clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
+    timeLeft--;
+    updateTimerDisplay();
+    if (timeLeft <= 0) {
+      stopTimer();
+      toast('⏰ ¡Tiempo agotado! Enviando resultados…', 4500);
+      finishExam(true);
+    }
+  }, 1000);
+}
+
+function stopTimer() {
+  if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+}
+
+function updateTimerDisplay() {
+  const t = Math.max(0, timeLeft);
+  const m = String(Math.floor(t / 60)).padStart(2, '0');
+  const s = String(t % 60).padStart(2, '0');
+  const el = document.getElementById('display-timer');
+  if (el) el.textContent = `${m}:${s}`;
+  const box = document.getElementById('timer-box');
+  if (box) {
+    box.classList.toggle('warn',   t <= 60 && t > 30);
+    box.classList.toggle('danger', t <= 30);
+  }
 }
 
 /* === RENDER === */
@@ -667,9 +1019,10 @@ function updateProgress() {
 }
 
 /* === FINISH === */
-function finishExam() {
+function finishExam(forced = false) {
+  if (examFinished) return;
   const total = currentQuestions.length, done = Object.keys(answers).length;
-  if (done < total) {
+  if (!forced && done < total) {
     let firstUnanswered = null;
     currentQuestions.forEach((_, qi) => {
       const card = document.getElementById(`qc${qi}`);
@@ -683,54 +1036,88 @@ function finishExam() {
     toast(`⚠️ Debes responder todas las preguntas (faltan ${total - done}).`);
     return;
   }
+  examFinished = true;
+  stopTimer();
   endTime = new Date();
   document.getElementById('display-end').textContent = endTime.toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  saveToFirebase();
-  generatePDF();
+  // Deshabilitar el botón para evitar doble envío
+  const btn = document.querySelector('.btn-finish');
+  if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; btn.style.cursor = 'not-allowed'; }
+  saveToFirebase(forced);
 }
 
 /* === GUARDAR EN FIREBASE === */
-async function saveToFirebase() {
+async function saveToFirebase(forced = false) {
   try {
     if (!window._db) {
       console.warn('Firebase aún no está listo.');
       toast('⚠️ Firebase no configurado.');
       return;
     }
-    // Calcular puntaje
-    let correctas = 0;
+    // Calcular puntaje (las no respondidas cuentan como INCORRECTAS)
+    let correctas = 0, sinResponder = 0;
     const detalle = currentQuestions.map((q, qi) => {
       const sel = q.options[answers[qi]];
-      const ok  = !!(sel && sel.correct);
+      const respondida = sel !== undefined;
+      const ok = !!(sel && sel.correct);
       if (ok) correctas++;
+      if (!respondida) sinResponder++;
       return {
         pregunta: q.text,
         respuesta: sel ? sel.text : null,
-        correcta: ok
+        correcta: ok,
+        respondida: respondida
       };
     });
 
     const payload = {
-      nombre:      studentName,
-      correctas:   correctas,
-      total:       currentQuestions.length,
-      horaInicio:  startTime.toISOString(),
-      horaFin:     endTime.toISOString(),
-      fecha:       startTime.toLocaleDateString('es-BO', { day: '2-digit', month: 'short', year: 'numeric' }),
-      detalle:     detalle,
-      guardadoEn:  window._serverTimestamp()
+      nombre:        studentName,
+      apellidos:     studentLastname,
+      paralelo:      studentParallel,
+      curso:         '5to Secundaria',
+      correctas:     correctas,
+      total:         currentQuestions.length,
+      sinResponder:  sinResponder,
+      tiempoVencido: forced,
+      horaInicio:    startTime.toISOString(),
+      horaFin:       endTime.toISOString(),
+      fecha:         startTime.toLocaleDateString('es-BO', { day: '2-digit', month: 'short', year: 'numeric' }),
+      detalle:       detalle,
+      guardadoEn:    window._serverTimestamp()
     };
 
     await window._addDoc(window._collection(window._db, 'resultados'), payload);
-    toast('✅ Resultado enviado al docente.');
+    toast(forced
+      ? '⏰ Tiempo agotado. Resultado enviado al docente.'
+      : '✅ Evaluación terminada. Resultado enviado al docente.', 4500);
+    showFinishedScreen(forced);
   } catch (err) {
     console.error('Error guardando en Firebase:', err);
-    toast('⚠️ No se pudo enviar el resultado.');
+    toast('⚠️ No se pudo enviar el resultado.', 4500);
   }
 }
 
-/* === PDF === */
-function generatePDF() {
+/* === PANTALLA FINAL === */
+function showFinishedScreen(forced = false) {
+  const c = document.getElementById('questions-container');
+  if (c) c.innerHTML = `
+    <div style="text-align:center;padding:40px 20px;border:1px solid var(--border);border-radius:12px;background:var(--card);">
+      <div style="font-size:48px;margin-bottom:12px;">${forced ? '⏰' : '✅'}</div>
+      <div style="font-family:'Playfair Display',serif;font-size:1.4rem;font-weight:700;margin-bottom:8px;">
+        ${forced ? '¡Tiempo agotado!' : '¡Evaluación terminada!'}
+      </div>
+      <div style="font-size:13.5px;color:var(--text2);line-height:1.5;">
+        ${forced
+          ? 'Se envió tu resultado automáticamente.<br>Las preguntas sin responder cuentan como incorrectas.'
+          : 'Tu resultado fue enviado al docente.<br>Puedes cerrar esta ventana.'}
+      </div>
+    </div>`;
+  const btn = document.querySelector('.btn-finish');
+  if (btn) btn.style.display = 'none';
+}
+
+/* === PDF (deshabilitado) === */
+function _disabled_generatePDF() {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const W = 210, H = 297, M = 22; let y = M;

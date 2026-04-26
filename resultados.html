@@ -113,6 +113,15 @@ tr.row-entry:hover{background:var(--surface);}
 .pct-bar-fill{height:100%;border-radius:99px;transition:width .5s;}
 .pct-label{font-size:11.5px;font-weight:600;color:var(--text2);min-width:32px;text-align:right;}
 
+/* Paralelo chip */
+.par-chip{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;font-size:12px;font-weight:700;border:1px solid var(--border);background:var(--surface);color:var(--text);}
+.par-chip.par-A{background:#e8f0fe;color:#1a73e8;border-color:#bcd4f7;}
+.par-chip.par-B{background:#fffbeb;color:#b45309;border-color:#fde68a;}
+.par-chip.par-C{background:#f0fdf4;color:#16a34a;border-color:#bbf7d0;}
+[data-theme="dark"] .par-chip.par-A{background:#1e2a3e;color:#4d90fe;border-color:#2a3a55;}
+[data-theme="dark"] .par-chip.par-B{background:#1c1100;color:#fcd34d;border-color:#78350f;}
+[data-theme="dark"] .par-chip.par-C{background:#052e16;color:#22c55e;border-color:#166534;}
+
 /* Empty state */
 .empty{text-align:center;padding:60px 20px;color:var(--text3);}
 .empty svg{width:40px;height:40px;margin:0 auto 12px;opacity:.35;}
@@ -132,7 +141,9 @@ tr.row-entry:hover{background:var(--surface);}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
 
 @media(max-width:600px){
-  th:nth-child(4),td:nth-child(4){display:none;}
+  th:nth-child(7),td:nth-child(7),
+  th:nth-child(8),td:nth-child(8),
+  th:nth-child(9),td:nth-child(9){display:none;}
   .pct-bar-track{min-width:40px;}
   .page{padding:24px 14px 60px;}
 }
@@ -203,6 +214,8 @@ tr.row-entry:hover{background:var(--surface);}
         <tr>
           <th>#</th>
           <th>Estudiante</th>
+          <th>Apellidos</th>
+          <th>Paralelo</th>
           <th>Resultado</th>
           <th>Progreso</th>
           <th>Hora Inicio</th>
@@ -266,9 +279,19 @@ function startListening() {
       '<p style="color:#dc2626;padding:20px;font-size:13px">⚠️ Firebase no configurado. Edita las credenciales en ambos archivos HTML.</p>';
     return;
   }
-  const q = window._query(window._collection(db,'resultados'), window._orderBy('guardadoEn','desc'));
+  const q = window._query(window._collection(db,'resultados'));
   window._onSnapshot(q, snap => {
     allResults = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // Ordenar por paralelo (A, B, C) y luego por apellidos
+    allResults.sort((a, b) => {
+      const pa = (a.paralelo || 'Z').toUpperCase();
+      const pb = (b.paralelo || 'Z').toUpperCase();
+      if (pa !== pb) return pa.localeCompare(pb);
+      const aa = (a.apellidos || '').toLowerCase();
+      const ab = (b.apellidos || '').toLowerCase();
+      if (aa !== ab) return aa.localeCompare(ab);
+      return (a.nombre || '').localeCompare(b.nombre || '');
+    });
     renderTable(allResults);
     updateStats(allResults);
   }, err => {
@@ -303,15 +326,18 @@ function renderTable(data) {
     const pct   = Math.round((r.correctas / r.total) * 100);
     const bClass= badgeClass(pct);
     const color = pctColor(pct);
+    const par   = r.paralelo || '—';
     return `
       <tr class="row-entry" data-id="${r.id}">
         <td style="color:var(--text3);font-size:12px;width:36px">${i+1}</td>
         <td>
           <div class="name-cell">
             <div class="avatar">${initials(r.nombre)}</div>
-            <span class="name-text">${r.nombre}</span>
+            <span class="name-text">${r.nombre || ''}</span>
           </div>
         </td>
+        <td><span class="name-text">${r.apellidos || '—'}</span></td>
+        <td><span class="par-chip par-${par}">${par}</span></td>
         <td>
           <span class="score-badge ${bClass}">
             ${r.correctas} / ${r.total}
@@ -354,7 +380,10 @@ function updateStats(data) {
 function filterTable() {
   const q = document.getElementById('search-input').value.toLowerCase();
   const filtered = q
-    ? allResults.filter(r => r.nombre.toLowerCase().includes(q))
+    ? allResults.filter(r =>
+        (r.nombre || '').toLowerCase().includes(q) ||
+        (r.apellidos || '').toLowerCase().includes(q) ||
+        (r.paralelo || '').toLowerCase().includes(q))
     : allResults;
   renderTable(filtered);
 }
